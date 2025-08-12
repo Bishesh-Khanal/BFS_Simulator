@@ -1,20 +1,80 @@
-// BFS_DFS.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <iostream>
+#include <tuple>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <queue>
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    srand(time(NULL));
+
+    std::vector<int> BFS_result;
+    std::vector<int> BFS_queue;
+    int current = 0;
+    int fringe;
+    bool visited = false;
+
+    int nodes = 8;
+    std::vector<std::tuple<int, int>> graph = { {5,1}, {4,1}, {1,2}, {7,2}, {2,6}, {2,3}, {5,8} };
+    const int inner_pos = 0 + rand() % 2;
+    const int outer_pos = 0 + rand() % graph.size();
+
+    switch (inner_pos)
+    {
+        case 0:
+            fringe = std::get<0>(graph[outer_pos]);
+        break;
+        default:
+            fringe = std::get<1>(graph[outer_pos]);
+        break;
+    }
+    BFS_result.push_back(fringe);
+    while (true)
+    {
+        std::cout << fringe << "  ";
+        for (auto& relation : graph)
+        {
+            if (std::get<0>(relation) == fringe)
+            { 
+                for (auto& node : BFS_result)
+                {
+                    if (node == std::get<1>(relation))
+                    {
+                        visited = true;
+                        break;
+                    }
+                }
+                if (!visited)
+                {
+                    BFS_result.push_back(std::get<1>(relation));
+                }
+            }
+            else if (std::get<1>(relation) == fringe)
+            {
+                for (auto& node : BFS_result)
+                {
+                    if (node == std::get<0>(relation))
+                    {
+                        visited = true;
+                        break;
+                    }
+                }
+                if (!visited)
+                {
+                    BFS_result.push_back(std::get<0>(relation));
+                }
+            }
+            visited = false;
+        }
+        if (current >= nodes-1)
+        {
+            break;
+        }
+        current++;
+        fringe = BFS_result[current];
+    }
+    std::cout << std::endl;
+    return 0;
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
