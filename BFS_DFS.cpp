@@ -53,7 +53,7 @@ int main()
 
     std::cout << std::endl;
 
-    sf::RenderWindow window(sf::VideoMode(800, 800), "Simulator");
+    sf::RenderWindow window(sf::VideoMode(640, 640), "Simulator");
     sf::Event event;
 
     while (window.isOpen())
