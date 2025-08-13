@@ -1,80 +1,72 @@
 #include <iostream>
-#include <tuple>
 #include <vector>
 #include <cstdlib>
 #include <ctime>
 #include <queue>
+#include "SFML_Stuff/include/SFML/Graphics.hpp"
 
 int main()
 {
     srand(time(NULL));
 
-    std::vector<int> BFS_result;
-    std::vector<int> BFS_queue;
-    int current = 0;
+    std::vector<int> BFS;
+    std::queue<int> BFS_queue;
     int fringe;
-    bool visited = false;
-
-    int nodes = 8;
-    std::vector<std::tuple<int, int>> graph = { {5,1}, {4,1}, {1,2}, {7,2}, {2,6}, {2,3}, {5,8} };
-    const int inner_pos = 0 + rand() % 2;
-    const int outer_pos = 0 + rand() % graph.size();
-
-    switch (inner_pos)
+    std::vector<std::vector<int>> graph = 
     {
-        case 0:
-            fringe = std::get<0>(graph[outer_pos]);
-        break;
-        default:
-            fringe = std::get<1>(graph[outer_pos]);
-        break;
-    }
-    BFS_result.push_back(fringe);
-    while (true)
+        {2,4,5},
+        {1,3,6,7},
+        {2},
+        {1},
+        {1,8},
+        {2},
+        {2},
+        {5}
+    };
+
+
+    fringe = 1 + rand() % 8;
+    std::vector<bool> visited(graph.size(), false);
+    BFS.push_back(fringe);
+    BFS_queue.push(fringe);
+    visited[fringe - 1] = true;
+
+    while (!BFS_queue.empty())
     {
-        std::cout << fringe << "  ";
-        for (auto& relation : graph)
+        fringe = BFS_queue.front();
+        BFS_queue.pop();
+        for (auto& adj : graph[fringe - 1])
         {
-            if (std::get<0>(relation) == fringe)
-            { 
-                for (auto& node : BFS_result)
-                {
-                    if (node == std::get<1>(relation))
-                    {
-                        visited = true;
-                        break;
-                    }
-                }
-                if (!visited)
-                {
-                    BFS_result.push_back(std::get<1>(relation));
-                }
-            }
-            else if (std::get<1>(relation) == fringe)
+            if (!visited[adj-1])
             {
-                for (auto& node : BFS_result)
-                {
-                    if (node == std::get<0>(relation))
-                    {
-                        visited = true;
-                        break;
-                    }
-                }
-                if (!visited)
-                {
-                    BFS_result.push_back(std::get<0>(relation));
-                }
+                visited[adj - 1] = true;
+                BFS.push_back(adj);
+                BFS_queue.push(adj);
             }
-            visited = false;
         }
-        if (current >= nodes-1)
-        {
-            break;
-        }
-        current++;
-        fringe = BFS_result[current];
     }
+
+    for (auto& node : BFS)
+    {
+        std::cout << node << "  ";
+    }
+
     std::cout << std::endl;
+
+    sf::RenderWindow window(sf::VideoMode(800, 800), "Simulator");
+    sf::Event event;
+
+    while (window.isOpen())
+    {
+        while(window.pollEvent(event))
+        {
+            if (event.type == sf::Event::Closed)
+            {
+                window.close();
+            }
+        }
+    }
+
     return 0;
 }
 
