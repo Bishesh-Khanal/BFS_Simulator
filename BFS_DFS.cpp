@@ -1,9 +1,8 @@
-#include <iostream>
-#include <vector>
 #include <cstdlib>
 #include <ctime>
 #include <queue>
-#include "SFML_Stuff/include/SFML/Graphics.hpp"
+#include "GameEngine.h"
+#include <fstream>
 
 int main()
 {
@@ -51,21 +50,8 @@ int main()
         std::cout << node << "  ";
     }
 
-    std::cout << std::endl;
-
-    sf::RenderWindow window(sf::VideoMode(640, 640), "Simulator");
-    sf::Event event;
-
-    while (window.isOpen())
-    {
-        while(window.pollEvent(event))
-        {
-            if (event.type == sf::Event::Closed)
-            {
-                window.close();
-            }
-        }
-    }
+    std::shared_ptr<GameEngine> game = std::make_shared<GameEngine>();
+    game->run(game);
 
     return 0;
 }
