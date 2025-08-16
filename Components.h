@@ -58,14 +58,13 @@ public:
 		if (nameAsset == "Grass")
 		{
 			rectangle.setFillColor(sf::Color::Green);
-			//rectangle.setOutlineColor(sf::Color::White);
 		}
 		else if (nameAsset == "Block")
 		{
 			rectangle.setFillColor(sf::Color::Black);
-			//rectangle.setOutlineColor(sf::Color::White);
 		}
-		//rectangle.setOutlineThickness(1.0f);
+		rectangle.setOutlineColor(sf::Color::White);
+		rectangle.setOutlineThickness(1.0f);
 		rectangle.setOrigin(bbox.x / 2, bbox.y / 2);
 	}
 };

@@ -19,6 +19,10 @@ private:
 	bool							m_chooseNext	= true;
 	std::vector<std::vector<int>>	m_adjacent;
 	std::vector<char>				m_colors;
+	std::vector<int>				m_BFS;
+	std::vector<int>				m_path;
+	std::queue<int>					m_BFSqueue;
+	int								m_fringe;
 
 
 	void init(const std::string&);
@@ -28,7 +32,7 @@ private:
 	void sRender()							override;
 	void sDoAction(const Action&)			override;
 	const ActionMap& getActionMap() const	override;
-	void simulate()                         override;
+	std::vector<int> simulate()             override;
 
 	void sDebug();
 

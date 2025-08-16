@@ -12,12 +12,54 @@ void SceneSimulation::init(const std::string& levelPath)
 	registerAction(sf::Keyboard::Space, "PAUSE");
 
 	loadLevel(levelPath);
-	getAdjacentTiles();
 }
 
-void SceneSimulation::simulate()
+std::vector<int> SceneSimulation::simulate()
 {
+	std::vector<bool> visited(m_adjacent.size(), false);
+	std::vector<int> parent(m_adjacent.size(), -1);
 
+	m_fringe = m_start->id();
+	m_BFS.push_back(m_fringe);
+	m_BFSqueue.push(m_fringe);
+	visited[m_fringe] = true;
+
+	while (!m_BFSqueue.empty())
+	{
+		m_fringe = m_BFSqueue.front();
+		m_BFSqueue.pop();
+		for (auto& adj : m_adjacent[m_fringe])
+		{
+			if (adj != -1)
+			{
+				if (adj == m_end->id())
+				{
+					parent[adj] = m_fringe; // <-- make sure the target knows its parent
+
+					int curr = m_end->id();
+					std::vector<int> path;
+					while (curr != -1) {
+						path.push_back(curr);
+						curr = parent[curr];
+					}
+					std::reverse(path.begin(), path.end());
+
+					std::cout << "Path: ";
+					for (int node : path) std::cout << node << " ";
+					std::cout << std::endl;
+					return path;
+				}
+				if (!visited[adj])
+				{
+					visited[adj] = true;
+					parent[adj] = m_fringe;
+					m_BFS.push_back(adj);
+					m_BFSqueue.push(adj);
+				}
+			}
+		}
+	}
+	return {};
 }
 
 
@@ -307,34 +349,34 @@ void SceneSimulation::getAdjacentTiles()
 			}
 		}
 	}
-	int j = 0;
-	for (auto& adjVec : m_adjacent)
-	{
-		std::cout << j << ": ";
-		for (auto& adj : adjVec)
-		{
-			std::cout << adj << "  ";
-		}
-		j++;
-		std::cout << std::endl;
-	}
 }
 
 SceneSimulation::SceneSimulation(std::shared_ptr<GameEngine> game, const std::string& level_path)
 	: Scene(std::move(game))
 	, m_levelPath(level_path)
 {
-	SceneSimulation::init(m_levelPath);
+	init(m_levelPath);
+	getAdjacentTiles();
 }
 
 void SceneSimulation::sDebug()
 {
 	for (auto& entity : m_entities.getEntities())
 	{
-		if (entity->hasComponent<CBoundingBox>())
+		entity->getComponent<CBoundingBox>().rectangle.setPosition(entity->getComponent<CTransform>().pos.x, entity->getComponent<CTransform>().pos.y);
+		m_game->m_window.draw(entity->getComponent<CBoundingBox>().rectangle);
+	}
+	if (m_path.size() > 0)
+	{
+		for (auto& node : m_path)
 		{
-			entity->getComponent<CBoundingBox>().rectangle.setPosition(entity->getComponent<CTransform>().pos.x, entity->getComponent<CTransform>().pos.y);
-			m_game->m_window.draw(entity->getComponent<CBoundingBox>().rectangle);
+			for (auto& entity : m_entities.getEntities())
+			{
+				if (node == entity->id())
+				{
+					entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
+				}
+			}
 		}
 	}
 }
@@ -365,7 +407,7 @@ void SceneSimulation::sDoAction(const Action& action)
 
 		if (action.name() == "LEFT_CLICK")
 		{
-			if(m_chooseNext)
+			if (m_chooseNext)
 			{
 				Vec2 worldPos = windowToWorld(action.pos());
 				for (auto& e : m_entities.getEntities())
@@ -383,11 +425,17 @@ void SceneSimulation::sDoAction(const Action& action)
 							m_end = e;
 							std::cout << "End: " << m_end->id() << std::endl;
 							m_end->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
+							m_chooseNext = !m_chooseNext;
 						}
 						m_pointToggle = !m_pointToggle;
 					}
 				}
 			}
+			/*
+			if (!m_chooseNext) {
+				simulate();
+			}
+			*/
 		}
 
 		if (action.name() == "MOUSE_MOVE")
@@ -411,16 +459,10 @@ const ActionMap& SceneSimulation::getActionMap() const
 
 void SceneSimulation::update() {
 	m_entities.update();
-	/*
-	if (!m_paused) {
-		sMovement();
-		sCollision();
-		sAnimation();
-		spawnBullet();
-		sLifeSpan();
-		sDragAndDrop();
+	if (!m_chooseNext) {
+		m_path = simulate();
+		m_chooseNext = !m_chooseNext;
 	}
-	*/
 }
 
 
