@@ -49,34 +49,14 @@ public:
 	{
 	}
 
-	CBoundingBox(const Vec2& bbox, const std::string& nameAsset, bool h = true)
+	CBoundingBox(const Vec2& bbox, bool h = true)
 		: boundingbox(bbox)
 		, has(h)
 		, halfSize(bbox / 2)
 	{
 		rectangle.setSize(sf::Vector2f(bbox.x, bbox.y));
-		if (nameAsset == "Grass")
-		{
-			rectangle.setFillColor(sf::Color::Green);
-		}
-		else if (nameAsset == "Block")
-		{
-			rectangle.setFillColor(sf::Color::Black);
-		}
-		rectangle.setOutlineColor(sf::Color::White);
+		rectangle.setOutlineColor(sf::Color::Black);
 		rectangle.setOutlineThickness(1.0f);
 		rectangle.setOrigin(bbox.x / 2, bbox.y / 2);
-	}
-};
-
-class CInput
-{
-public:
-	bool has = false;
-
-	bool pointToggle = false;
-
-	CInput()
-	{
 	}
 };

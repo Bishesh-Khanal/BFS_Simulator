@@ -9,8 +9,7 @@ class EntityManager;
 
 typedef std::tuple<
 	CTransform,
-	CBoundingBox,
-	CInput
+	CBoundingBox
 > ComponentTuple;
 
 class Entity

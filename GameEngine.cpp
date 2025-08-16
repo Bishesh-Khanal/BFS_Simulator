@@ -20,7 +20,7 @@ void GameEngine::init()
 void GameEngine::run(std::shared_ptr<GameEngine> game)
 {
     std::cout << "Running the game engine" << std::endl;
-    changeScene("SIMULATION", std::make_shared<SceneSimulation>(game, "bin/levels/lvl1.txt"));
+    changeScene("SIMULATION", std::make_shared<SceneSimulation>(game, "bin/levels/rock_sea_land.txt"));
 
     while (m_running)
     {

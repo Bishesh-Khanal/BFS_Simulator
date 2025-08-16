@@ -4,57 +4,122 @@
 
 #include <fstream>
 #include <sstream>
+#include <thread>
+#include <chrono>
 
 void SceneSimulation::init(const std::string& levelPath)
 {
 	std::cout << "Simulation started" << std::endl;
-	registerAction(sf::Keyboard::Escape, "QUIT");
-	registerAction(sf::Keyboard::Space, "PAUSE");
 
 	loadLevel(levelPath);
 }
 
-std::vector<int> SceneSimulation::simulate()
+void SceneSimulation::startBFS()
 {
-	std::vector<bool> visited(m_adjacent.size(), false);
-	std::vector<int> parent(m_adjacent.size(), -1);
+	m_visited.assign(m_adjacent.size(), false);
+	m_parent.assign(m_adjacent.size(), nullptr);
+	while (!m_BFSqueue.empty()) m_BFSqueue.pop();
 
-	m_fringe = m_start->id();
+	m_BFSqueue.push(m_start);
+	m_visited[m_start->id()] = true;
+	m_bfsActive = true;
+	m_stepClock.restart();
+}
+
+bool SceneSimulation::bfsStep() {
+	if (m_BFSqueue.empty()) { m_bfsActive = false; return true; }
+
+	m_fringe = m_BFSqueue.front();
+	m_BFSqueue.pop();
+
+	for (auto& adj : m_adjacent[m_fringe->id()])
+	{
+		if (adj != nullptr)
+		{
+			if (adj->id() == m_end->id())
+			{
+				m_parent[adj->id()] = m_fringe; // <-- make sure the target knows its parent
+
+				std::shared_ptr<Entity> curr = m_end;
+				std::vector<std::shared_ptr<Entity>> path;
+				while (curr != nullptr) {
+					path.push_back(curr);
+					curr = m_parent[curr->id()];
+				}
+				std::reverse(path.begin(), path.end());
+
+				std::cout << "Path: ";
+				for (auto& node : path)
+				{
+					std::cout << node->id() << " ";
+					node->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
+				}
+				std::cout << std::endl;
+				m_bfsActive = false;
+				return true;
+			}
+			if (!m_visited[adj->id()])
+			{
+				m_visited[adj->id()] = true;
+				m_parent[adj->id()] = m_fringe;
+				m_BFS.push_back(adj);
+				m_BFSqueue.push(adj);
+				adj->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::Red);
+			}
+		}
+	}
+	return false;
+}
+
+std::vector<std::shared_ptr<Entity>> SceneSimulation::simulate()
+{
+	if (m_start == m_end) return { m_start };
+
+	std::vector<bool> visited(m_adjacent.size(), false);
+	std::vector<std::shared_ptr<Entity>> parent(m_adjacent.size(), nullptr);
+
+	m_fringe = m_start;
 	m_BFS.push_back(m_fringe);
 	m_BFSqueue.push(m_fringe);
-	visited[m_fringe] = true;
+	visited[m_fringe->id()] = true;
 
 	while (!m_BFSqueue.empty())
 	{
 		m_fringe = m_BFSqueue.front();
 		m_BFSqueue.pop();
-		for (auto& adj : m_adjacent[m_fringe])
-		{
-			if (adj != -1)
-			{
-				if (adj == m_end->id())
-				{
-					parent[adj] = m_fringe; // <-- make sure the target knows its parent
 
-					int curr = m_end->id();
-					std::vector<int> path;
-					while (curr != -1) {
+		for (auto& adj : m_adjacent[m_fringe->id()])
+		{
+			if (adj != nullptr)
+			{
+				if (adj->id() == m_end->id())
+				{
+					parent[adj->id()] = m_fringe; // <-- make sure the target knows its parent
+
+					std::shared_ptr<Entity> curr = m_end;
+					std::vector<std::shared_ptr<Entity>> path;
+					while (curr != nullptr) {
 						path.push_back(curr);
-						curr = parent[curr];
+						curr = parent[curr->id()];
 					}
 					std::reverse(path.begin(), path.end());
 
 					std::cout << "Path: ";
-					for (int node : path) std::cout << node << " ";
+					for (auto& node : path)
+					{
+						std::cout << node->id() << " ";
+						node->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
+					}
 					std::cout << std::endl;
 					return path;
 				}
-				if (!visited[adj])
+				if (!visited[adj->id()])
 				{
-					visited[adj] = true;
-					parent[adj] = m_fringe;
+					visited[adj->id()] = true;
+					parent[adj->id()] = m_fringe;
 					m_BFS.push_back(adj);
 					m_BFSqueue.push(adj);
+					adj->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::Red);
 				}
 			}
 		}
@@ -106,14 +171,26 @@ void SceneSimulation::loadLevel(const std::string& level_path)
 		}
 
 		std::istringstream lineStream(line);
-		std::string assetType, nameAsset;
+		std::string nameAsset;
 		float xAsset, yAsset;
 
-		if (lineStream >> assetType >> nameAsset >> xAsset >> yAsset)
+		if (lineStream >> nameAsset >> xAsset >> yAsset)
 		{
-			auto entity = m_entities.addEntity(assetType);
+			auto entity = m_entities.addEntity(nameAsset);
 
-			entity->addComponent<CBoundingBox>(m_gridSize, nameAsset);
+			entity->addComponent<CBoundingBox>(m_gridSize);
+			if (nameAsset == "Land")
+			{
+				entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::Green);
+			}
+			else if (nameAsset == "Rock")
+			{
+				entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color(128,128,128));
+			}
+			else if (nameAsset == "Sea")
+			{
+				entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::Blue);
+			}
 			entity->addComponent<CTransform>(gridtoMidPixel(xAsset, yAsset, entity));
 			m_colors.push_back(nameAsset[0]);
 
@@ -127,225 +204,228 @@ void SceneSimulation::loadLevel(const std::string& level_path)
 
 void SceneSimulation::getAdjacentTiles()
 {
-	for (int i = 0; i < m_colors.size(); i++)
+	auto& entities = m_entities.getEntities();
+	std::cout << "Number of entities: " << entities.size() << std::endl;
+	std::cout << "Number of colors: " << m_colors.size() << std::endl;
+	for (int i = 0; i < entities.size(); i++)
 	{
 		if (i == 0)
 		{
 			if (m_colors[i + 1] == m_colors[i])
 			{
-				m_adjacent.push_back({ i + 1 });
+				m_adjacent.push_back({ entities[i + 1] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
-			if (m_colors[i + 10] == m_colors[i])
+			if (m_colors[i + 64] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 10);
+				m_adjacent[i].push_back(entities[i + 64]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
-		else if (i == 9)
+		else if (i == 63)
 		{
 			if (m_colors[i - 1] == m_colors[i])
 			{
-				m_adjacent.push_back({ i - 1 });
+				m_adjacent.push_back({ entities[i - 1] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
-			if (m_colors[i + 10] == m_colors[i])
+			if (m_colors[i + 64] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 10);
+				m_adjacent[i].push_back(entities[i + 64]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
-		else if (i == 90)
+		else if (i == 4032)
 		{
-			if (m_colors[i - 10] == m_colors[i])
+			if (m_colors[i - 64] == m_colors[i])
 			{
-				m_adjacent.push_back({ i - 10 });
+				m_adjacent.push_back({ entities[i - 64] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
 			if (m_colors[i + 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 1);
+				m_adjacent[i].push_back(entities[i + 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
-		else if (i == 99)
+		else if (i == 4095)
 		{
-			if (m_colors[i - 10] == m_colors[i])
+			if (m_colors[i - 64] == m_colors[i])
 			{
-				m_adjacent.push_back({ i - 10 });
+				m_adjacent.push_back({ entities[i - 64] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
 			if (m_colors[i - 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i - 1);
+				m_adjacent[i].push_back(entities[i - 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
-		else if (i > 0 && i < 9)
+		else if (i > 0 && i < 63)
 		{
 			if (m_colors[i - 1] == m_colors[i])
 			{
-				m_adjacent.push_back({ i - 1 });
+				m_adjacent.push_back({ entities[i - 1] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
 			if (m_colors[i + 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 1);
+				m_adjacent[i].push_back(entities[i + 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
-			if (m_colors[i + 10] == m_colors[i])
+			if (m_colors[i + 64] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 10);
+				m_adjacent[i].push_back(entities[i + 64]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
-		else if (i > 90 && i < 99)
+		else if (i > 4032 && i < 4095)
 		{
-			if (m_colors[i - 10] == m_colors[i])
+			if (m_colors[i - 64] == m_colors[i])
 			{
-				m_adjacent.push_back({ i - 10 });
+				m_adjacent.push_back({ entities[i - 64] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
 			if (m_colors[i - 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i - 1);
+				m_adjacent[i].push_back(entities[i - 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 			if (m_colors[i + 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 1);
+				m_adjacent[i].push_back(entities[i + 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
-		else if (i % 10 == 0)
+		else if (i % 64 == 0)
 		{
-			if (m_colors[i - 10] == m_colors[i])
+			if (m_colors[i - 64] == m_colors[i])
 			{
-				m_adjacent.push_back({ i - 10 });
+				m_adjacent.push_back({ entities[i - 64] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
 			if (m_colors[i + 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 1);
+				m_adjacent[i].push_back(entities[i + 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
-			if (m_colors[i + 10] == m_colors[i])
+			if (m_colors[i + 64] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 10);
+				m_adjacent[i].push_back(entities[i + 64]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
-		else if (i % 10 == 9)
+		else if (i % 64 == 63)
 		{
-			if (m_colors[i - 10] == m_colors[i])
+			if (m_colors[i - 64] == m_colors[i])
 			{
-				m_adjacent.push_back({ i - 10 });
+				m_adjacent.push_back({ entities[i - 64] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
 			if (m_colors[i - 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i - 1);
+				m_adjacent[i].push_back(entities[i - 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
-			if (m_colors[i + 10] == m_colors[i])
+			if (m_colors[i + 64] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 10);
+				m_adjacent[i].push_back(entities[i + 64]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
 		else
 		{
-			if (m_colors[i - 10] == m_colors[i])
+			if (m_colors[i - 64] == m_colors[i])
 			{
-				m_adjacent.push_back({ i - 10 });
+				m_adjacent.push_back({ entities[i - 64] });
 			}
 			else
 			{
-				m_adjacent.push_back({ -1 });
+				m_adjacent.push_back({ nullptr });
 			}
 			if (m_colors[i - 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i - 1);
+				m_adjacent[i].push_back(entities[i - 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 			if (m_colors[i + 1] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 1);
+				m_adjacent[i].push_back(entities[i + 1]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
-			if (m_colors[i + 10] == m_colors[i])
+			if (m_colors[i + 64] == m_colors[i])
 			{
-				m_adjacent[i].push_back(i + 10);
+				m_adjacent[i].push_back(entities[i + 64]);
 			}
 			else
 			{
-				m_adjacent[i].push_back(-1);
+				m_adjacent[i].push_back(nullptr);
 			}
 		}
 	}
@@ -356,7 +436,6 @@ SceneSimulation::SceneSimulation(std::shared_ptr<GameEngine> game, const std::st
 	, m_levelPath(level_path)
 {
 	init(m_levelPath);
-	getAdjacentTiles();
 }
 
 void SceneSimulation::sDebug()
@@ -365,19 +444,6 @@ void SceneSimulation::sDebug()
 	{
 		entity->getComponent<CBoundingBox>().rectangle.setPosition(entity->getComponent<CTransform>().pos.x, entity->getComponent<CTransform>().pos.y);
 		m_game->m_window.draw(entity->getComponent<CBoundingBox>().rectangle);
-	}
-	if (m_path.size() > 0)
-	{
-		for (auto& node : m_path)
-		{
-			for (auto& entity : m_entities.getEntities())
-			{
-				if (node == entity->id())
-				{
-					entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
-				}
-			}
-		}
 	}
 }
 
@@ -396,15 +462,6 @@ void SceneSimulation::sDoAction(const Action& action)
 {
 	if (action.type() == "START")
 	{
-		if (action.name() == "QUIT")
-		{
-			onEnd();
-		}
-		if (action.name() == "PAUSE")
-		{
-			m_paused = !m_paused;
-		}
-
 		if (action.name() == "LEFT_CLICK")
 		{
 			if (m_chooseNext)
@@ -416,26 +473,42 @@ void SceneSimulation::sDoAction(const Action& action)
 					{
 						if (!m_pointToggle)
 						{
+							for (auto& entity : m_entities.getEntities("Land"))
+							{
+								entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::Green);
+							}
+							for (auto& entity : m_entities.getEntities("Rock"))
+							{
+								entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color(128,128,128));
+							}
+							for (auto& entity : m_entities.getEntities("Sea"))
+							{
+								entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::Blue);
+							}
 							m_start = e;
 							std::cout << "Start: " << m_start->id() << std::endl;
 							m_start->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
+
 						}
 						if (m_pointToggle)
 						{
-							m_end = e;
-							std::cout << "End: " << m_end->id() << std::endl;
-							m_end->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
-							m_chooseNext = !m_chooseNext;
+							if(e->tag() == m_start->tag())
+							{
+								m_end = e;
+								std::cout << "End: " << m_end->id() << std::endl;
+								m_end->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
+								m_chooseNext = !m_chooseNext;
+								startBFS();
+							}
+							else
+							{
+								std::cout << "Cannot traverse from one type of grid to another." << std::endl;
+							}
 						}
 						m_pointToggle = !m_pointToggle;
 					}
 				}
 			}
-			/*
-			if (!m_chooseNext) {
-				simulate();
-			}
-			*/
 		}
 
 		if (action.name() == "MOUSE_MOVE")
@@ -459,10 +532,25 @@ const ActionMap& SceneSimulation::getActionMap() const
 
 void SceneSimulation::update() {
 	m_entities.update();
-	if (!m_chooseNext) {
-		m_path = simulate();
-		m_chooseNext = !m_chooseNext;
+	if (m_firstTime)
+	{
+		getAdjacentTiles();
+		m_firstTime = false;
 	}
+	
+	if (!m_chooseNext) {
+		if (m_bfsActive && m_stepClock.getElapsedTime().asMilliseconds() >= 0) {
+			bfsStep();
+			m_stepClock.restart();
+		}
+
+		if (!m_bfsActive && !m_chooseNext) {
+			m_chooseNext = true;
+			// pick next target or do other logic
+		}
+		//m_path = simulate();
+	}
+	
 }
 
 
@@ -480,7 +568,7 @@ void SceneSimulation::sRender()
 	m_game->m_window.clear(sf::Color(225, 225, 225));
 	sDebug();
 
-	m_mShape.setFillColor(sf::Color::Red);
+	m_mShape.setFillColor(sf::Color::Yellow);
 	m_mShape.setRadius(4);
 	m_mShape.setOrigin(2, 2);
 
