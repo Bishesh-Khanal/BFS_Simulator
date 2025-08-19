@@ -37,7 +37,6 @@ private:
 	void sRender()												override;
 	void sDoAction(const Action&)								override;
 	const ActionMap& getActionMap() const						override;
-	std::vector<std::shared_ptr<Entity>> simulate()             override;
 
 	void sDebug();
 

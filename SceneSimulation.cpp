@@ -41,15 +41,14 @@ bool SceneSimulation::bfsStep() {
 				m_parent[adj->id()] = m_fringe; // <-- make sure the target knows its parent
 
 				std::shared_ptr<Entity> curr = m_end;
-				std::vector<std::shared_ptr<Entity>> path;
 				while (curr != nullptr) {
-					path.push_back(curr);
+					m_path.push_back(curr);
 					curr = m_parent[curr->id()];
 				}
-				std::reverse(path.begin(), path.end());
+				std::reverse(m_path.begin(), m_path.end());
 
 				std::cout << "Path: ";
-				for (auto& node : path)
+				for (auto& node : m_path)
 				{
 					std::cout << node->id() << " ";
 					node->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
@@ -70,63 +69,6 @@ bool SceneSimulation::bfsStep() {
 	}
 	return false;
 }
-
-std::vector<std::shared_ptr<Entity>> SceneSimulation::simulate()
-{
-	if (m_start == m_end) return { m_start };
-
-	std::vector<bool> visited(m_adjacent.size(), false);
-	std::vector<std::shared_ptr<Entity>> parent(m_adjacent.size(), nullptr);
-
-	m_fringe = m_start;
-	m_BFS.push_back(m_fringe);
-	m_BFSqueue.push(m_fringe);
-	visited[m_fringe->id()] = true;
-
-	while (!m_BFSqueue.empty())
-	{
-		m_fringe = m_BFSqueue.front();
-		m_BFSqueue.pop();
-
-		for (auto& adj : m_adjacent[m_fringe->id()])
-		{
-			if (adj != nullptr)
-			{
-				if (adj->id() == m_end->id())
-				{
-					parent[adj->id()] = m_fringe; // <-- make sure the target knows its parent
-
-					std::shared_ptr<Entity> curr = m_end;
-					std::vector<std::shared_ptr<Entity>> path;
-					while (curr != nullptr) {
-						path.push_back(curr);
-						curr = parent[curr->id()];
-					}
-					std::reverse(path.begin(), path.end());
-
-					std::cout << "Path: ";
-					for (auto& node : path)
-					{
-						std::cout << node->id() << " ";
-						node->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
-					}
-					std::cout << std::endl;
-					return path;
-				}
-				if (!visited[adj->id()])
-				{
-					visited[adj->id()] = true;
-					parent[adj->id()] = m_fringe;
-					m_BFS.push_back(adj);
-					m_BFSqueue.push(adj);
-					adj->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::Red);
-				}
-			}
-		}
-	}
-	return {};
-}
-
 
 Vec2 SceneSimulation::windowToWorld(const Vec2& windowPos) const
 {
@@ -485,6 +427,7 @@ void SceneSimulation::sDoAction(const Action& action)
 							{
 								entity->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::Blue);
 							}
+							m_path.clear();
 							m_start = e;
 							std::cout << "Start: " << m_start->id() << std::endl;
 							m_start->getComponent<CBoundingBox>().rectangle.setFillColor(sf::Color::White);
@@ -539,6 +482,7 @@ void SceneSimulation::update() {
 	}
 	
 	if (!m_chooseNext) {
+		
 		if (m_bfsActive && m_stepClock.getElapsedTime().asMilliseconds() >= 0) {
 			bfsStep();
 			m_stepClock.restart();
@@ -546,9 +490,7 @@ void SceneSimulation::update() {
 
 		if (!m_bfsActive && !m_chooseNext) {
 			m_chooseNext = true;
-			// pick next target or do other logic
 		}
-		//m_path = simulate();
 	}
 	
 }
