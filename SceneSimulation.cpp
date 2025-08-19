@@ -38,7 +38,7 @@ bool SceneSimulation::bfsStep() {
 		{
 			if (adj->id() == m_end->id())
 			{
-				m_parent[adj->id()] = m_fringe; // <-- make sure the target knows its parent
+				m_parent[adj->id()] = m_fringe;
 
 				std::shared_ptr<Entity> curr = m_end;
 				while (curr != nullptr) {
